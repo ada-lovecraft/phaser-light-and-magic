@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="app">
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="styles/app.css">
+    <!-- external libs -->
+    <script src="lib/pathfinding-browser.js"></script>
+    <script src="lib/phaser.js"></script>
+  </head>
+  <body>
+    <div id="map-generator"></div>
+    <!-- game loader-->
+	<script src="game/main.js"></script>  
+    <!-- game states -->
+    <script src="game/states/boot.js"></script>
+    <script src="game/states/preload.js"></script>
+    <script src="game/states/menu.js"></script>
+    <script src="game/states/play.js"></script>
+    <!-- game classes -->
+    <script src="game/classes/SimpleChainGenerator.js"></script>
+
+
+  </body>
+</html>
