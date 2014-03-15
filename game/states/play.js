@@ -24,7 +24,6 @@
       layer = map.createLayer('Tile Layer 1');
       layer.resizeWorld();
       map.setCollisionBetween(1,100);
-      layer.debug = true;
       this.bmd = game.add.bitmapData(8,8);
       var ctx = this.bmd.ctx;
       ctx.fillStyle = "#dd3838";
