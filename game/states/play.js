@@ -16,7 +16,7 @@
     create: function() {
       ray = new Phaser.Line();
       lines = [];
-      for(var i = 0; i < 50; i++) {
+      for(var i = 0; i < 500; i++) {
         lines.push(new Phaser.Line());
       }
       map = game.add.tilemap('map');
@@ -33,7 +33,7 @@
       ctx.fill();
 
       this.dots = game.add.group();
-      for(var i = 0; i < 50; i++) {
+      for(var i = 0; i < 500; i++) {
         this.dots.create(0,0,this.bmd);
       }
       this.dots.setAll('anchor.x', 0.5);
@@ -42,51 +42,54 @@
 
       layer.resizeWorld();
 
-      /*
-      game.input.onDown.add(this.startLine, this);
-      game.input.onUp.add(this.raycast, this);
-      /*
-      var chainGenerator = new SimpleChainGenerator({imageSize: 400});
-      var points = chainGenerator.generateChain(game.rnd.integerInRange(3,10),128);
-      var bmd = game.add.bitmapData(128,128);
-
-      
-      var ctx = bmd.ctx;
-      ctx.setStrokeColor('#999');
-      ctx.rect(0,0,128,128);
-      ctx.setLineWidth(2);
-      ctx.stroke();
-
-      
-      
-      
-      this.poly = game.add.sprite(50,50, bmd);
-      
-      
-
-
-      
-      
-      this.poly = new Phaser.Polygon(points);
-      this.graphics = game.add.graphics(0,0);
-      this.graphics.beginFill(0x000000);
-      this.graphics.lineStyle(2, 0xffd900, 1);
-
-      this.graphics.drawPolygon(this.poly);
-      */
+     this.graphics = game.add.graphics(0,0);
       
     },
     shootRays: function() {
       var intersections = [];
-      for(var angle = 0; angle< Math.PI * 2; angle += (Math.PI*2) / lines.length) {
+      var segments = this.createSegmentsFromTiles(layer.getTiles(0,0,game.width, game.height,true,true));
+      var uniqueAngles = [];
+      var j;
+      var points = (function(segments) {
+        var a = [];
+        segments.forEach(function(segment) {
+          a.push(segment.start, segment.end);
+        });
+        return a;
+      })(segments);
+      var uniquePoints = (function(points) {
+        var set = {};
+        return points.filter(function(point) {
+          var key = point.x + ',' + point.y;
+          if(key in set) {
+            return false;
+          } else {
+            set[key] = true;
+            return true;
+          }
+        });
+      })(points);
+
+      for(j = 0; j < uniquePoints.length; j++) {
+        var uniquePoint = uniquePoints[j];
+        var angle = Math.atan2(uniquePoint.y - game.input.activePointer.y, uniquePoint.x - game.input.activePointer.x);
+        uniquePoint.angle = angle;
+        uniqueAngles.push(angle - 0.00001, angle, angle + 0.00001);
+      }
+
+      for(j = 0; j < uniqueAngles.length; j++) {
+        var angle = uniqueAngles[j];
         var dx = Math.cos(angle);
         var dy = Math.sin(angle);
         ray.start.set(game.input.activePointer.x, game.input.activePointer.y);
-        ray.end.set(game.width/2 + dx * game.width, game.height/2 + dy * game.height);
-        var hits = layer.getRayCastTiles(ray,4, false,false);
-        var intersection = this.getClosestIntersection(ray,hits);
-        intersections.push(intersection);
+        ray.end.set(game.input.activePointer.x + dx, game.input.activePointer.y + dy);
+        var intersection = this.getClosestIntersection(ray,segments);
+        if(!!intersection && intersection.x > 0 && intersection.x < game.world.width && intersection.y > 0 && intersection.y < game.world.height) {
+          intersection.angle = angle;
+          intersections.push(intersection);
+        }
       }
+
       return intersections;
     },
     drawLines: function(intersections) {
@@ -98,30 +101,28 @@
       });
 
     },
+    drawVisibilityPoly: function(intersections) {
+      this.graphics.clear();
+      intersections = intersections.sort(function(a,b) {
+        return a.angle - b.angle;
+      });
+      var points = [];
+      intersections.forEach(function(intersection) {
+        points.push(intersection.x, intersection.y);
+      });
+      var poly = new Phaser.Polygon(points);
+      
+      this.graphics.beginFill(0xFF0000);
 
-    raycast: function() {
-      tileHits = layer.getRayCastTiles(line,4, false,false);
-
-      if(tileHits.length > 0) {
-        for (var i = 0; i< tileHits.length; i++) {
-          tileHits[i].debug = true;
-        }
-
-        layer.dirty = true;
-      }
-
-      plotting = false;
-      return tileHits;
+      this.graphics.drawPolygon(poly);
     },
-    getClosestIntersection: function(ray,hits) {
+    getClosestIntersection: function(ray,segments) {
       //determine which side to come from
       var intersection = null;
       var closestIntersection;
       var raySegment = this.createSegmentFromRay(ray);
-      var segments = this.createSegmentsFromTiles(hits);
       var angles = [];
       segments.forEach(function(tileSegment) {
-
 
         if(raySegment.direction.x/raySegment.magnitude === tileSegment.direction.x/tileSegment.magnitude && raySegment.direction.y / raySegment.magnitude === tileSegment.direction.y/tileSegment.magnitude) {
           return null;
@@ -171,7 +172,9 @@
           segment.start.y = tile.bottom;
           segment.end.y = tile.bottom;
           segment.tile = tile;
-          segments.push(this.calculateSegmentProperties(segment));
+          if(!(segment in segments)) {
+            segments.push(this.calculateSegmentProperties(segment));
+          }
         }
         if(!!tile.faceTop) {
           segment = new Segment();
@@ -180,7 +183,9 @@
           segment.start.y = tile.top;
           segment.end.y = tile.top;
           segment.tile = tile;
-          segments.push(this.calculateSegmentProperties(segment));
+          if(!(segment in segments)) {
+            segments.push(this.calculateSegmentProperties(segment));
+          }
         }
         if(!!tile.faceLeft) {
           segment = new Segment();
@@ -189,7 +194,9 @@
           segment.start.y = tile.top;
           segment.end.y = tile.bottom;
           segment.tile = tile;
-          segments.push(this.calculateSegmentProperties(segment));
+          if(!(segment in segments)) {
+            segments.push(this.calculateSegmentProperties(segment));
+          }
         }
         if(!!tile.faceRight) {
           segment = new Segment();
@@ -198,7 +205,9 @@
           segment.start.y = tile.top;
           segment.end.y = tile.bottom;
           segment.tile = tile;
-          segments.push(this.calculateSegmentProperties(segment));
+          if(!(segment in segments)) {
+            segments.push(this.calculateSegmentProperties(segment));
+          }
         }
         return segments;
       }, this);
@@ -223,22 +232,10 @@
     update: function() {
       game.physics.arcade.collide(sprite, layer);
       var intersections = this.shootRays();
-      this.drawLines(intersections);
-      intersections.forEach(function(intersection, index) {
-        if(!!intersection) {
-          var dot = this.dots.getAt(index);
-          dot.x = intersection.x;
-          dot.y = intersection.y;
-          intersection.tile.alpha = 0;
-        }
-      }, this);
+      this.drawVisibilityPoly(intersections);
       
     },
     render: function() {
-      lines.forEach(function(line) {
-        game.debug.geom(line);  
-      });
-      
     }
   };
   PlayState = Play;
